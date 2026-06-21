@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Jordan's Protocol</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:#111920;color:#E8E0D8;font-family:'Outfit',sans-serif;font-size:14px}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#2A3D47;border-radius:99px}
+input::placeholder{color:#4A6070}select option{background:#182430;color:#E8E0D8}
+input[type=date]::-webkit-calendar-picker-indicator{filter:invert(0.4) sepia(0.4) hue-rotate(160deg)}
+button{touch-action:manipulation}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useCallback}=React;
+const T={bg:"#111920",sur:"#18242C",surHi:"#1E2E38",bdr:"#273848",bdrHi:"#354F62",
+  tx:"#E8E0D8",txM:"#8AAAB8",txD:"#4E6A7A",
+  acc:"#6DB8AE",accBg:"#102624",accBdr:"#2E6A5E",
+  grn:"#6DB8AE",grnBg:"#0E2422",grnBdr:"#2E6A5E",
+  amb:"#C8905A",ambBg:"#2A1C0C",ambBdr:"#7A4620",
+  ros:"#C07070",rosBg:"#2A1616",rosBdr:"#6A3030",
+  blu:"#5EA8D0",bluBg:"#0C1E30",bluBdr:"#2A5A7A",
+  pur:"#B09AD8",purBg:"#201840",purBdr:"#5A4A88"};
+
+function getToday(){return new Intl.DateTimeFormat("en-CA",{timeZone:"Australia/Sydney",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());}
+function sGet(k){try{const r=localStorage.getItem("jpt_"+k);return r?JSON.parse(r):null;}catch{return null;}}
+function sSet(k,v){try{localStorage.setItem("jpt_"+k,JSON.stringify(v));return true;}catch(e){if(k==="history"){try{const cut=new Date();cut.setDate(cut.getDate()-90);const pr=Object.fromEntries(Object.entries(v).filter(([d])=>new Date(d)>=cut));localStorage.setItem("jpt_"+k,JSON.stringify(pr));return true;}catch{return false;}}return false;}}
+
+const CYCLE_START="2026-06-22";
+function getCycleDay(){
+  const s=new Date(CYCLE_START+"T00:00:00+10:00");
+  const sUTC=Date.UTC(s.getFullYear(),s.getMonth(),s.getDate());
+  const ymd=new Intl.DateTimeFormat("en-CA",{timeZone:"Australia/Sydney",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+  const t=new Date(ymd+"T00:00:00");
+  return Math.floor((Date.UTC(t.getFullYear(),t.getMonth(),t.getDate())-sUTC)/86400000);
+}
+
+const PHARMA=[
+  {id:"aripiprazole",name:"aripiprazole",dose:"5mg",route:"oral",freq:"daily",notes:"Take with breakfast."},
+  {id:"anastrozole",name:"anastrozole",dose:"0.5mg",route:"oral",freq:"every 3 days (day 0, 3, 6…)",notes:"Auto-shown on correct days. E2 target 20–40 pg/mL."},
+  {id:"nebivolol",name:"nebivolol",dose:"2.5mg",route:"oral",freq:"if needed",notes:"Beta-1 blocker. Take if BP or HR elevated. OPTIONAL."},
+  {id:"telmisartan",name:"telmisartan",dose:"40mg",route:"oral",freq:"as needed",notes:"ARB. Use only if BP chronically elevated. OPTIONAL."},
+];
+const SUPPS=[
+  {id:"calcium_k2_d3",name:"calcium | k2 | d3",dose:"600mg | 180mcg | 1000 IU",notes:"Take with fat. K2 directs calcium to bones."},
+  {id:"creatine",name:"creatine",dose:"5g",notes:"Mix in water or shake."},
+  {id:"msm_boron",name:"msm | boron",dose:"750mg | 6mg",notes:"MSM for connective tissue; boron for free testosterone, bone."},
+  {id:"multivitamin",name:"multivitamin",dose:"1 tablet",notes:"Take with food."},
+  {id:"nail_gummy",name:"nail gummy",dose:"1 gummy",notes:"Nail, hair, and skin support. Take with food."},
+  {id:"omega3",name:"omega-3 | epa | dha",dose:"1500mg | 540mg | 360mg",notes:"Cardiovascular, anti-inflammatory, lipid management."},
+  {id:"probiotic",name:"probiotic",dose:"30b cfu",notes:"Gut microbiome support."},
+  {id:"vitd3",name:"vitamin d3 additional",dose:"2000iu",notes:"Take with fat. Immune, hormonal, bone support."},
+  {id:"tudca",name:"TUDCA",dose:"500mg",notes:"Hepatoprotective. Critical liver support on HGH protocol."},
+  {id:"dhb_am",name:"dihydroberberine (1st)",dose:"500mg",notes:"Blood glucose control. Take AFTER eating. OPTIONAL."},
+  {id:"vitc",name:"liposomal vitamin c",dose:"1000mg",notes:"Superior absorption. Collagen synthesis, antioxidant."},
+  {id:"dhb_lunch",name:"dihydroberberine (2nd)",dose:"500mg",notes:"DHB dose 2 of 3. Take after eating. OPTIONAL."},
+  {id:"nac",name:"NAC",dose:"1000mg",notes:"Antioxidant, liver support, glutathione precursor."},
+  {id:"taurine_am",name:"taurine (1st)",dose:"1g",notes:"Cardiac support, insulin sensitivity. Dose 1 of 2."},
+  {id:"ashwagandha",name:"ashwaghanda",dose:"~300mg",notes:"Adaptogen, cortisol reduction, sleep support. Take with food."},
+  {id:"eggshell",name:"eggshell powder",dose:"~450mg",notes:"~450mg calcium carbonate per serving."},
+  {id:"glucosamine",name:"glucosamine",dose:"1500mg",notes:"Cartilage and joint support. Take with food."},
+  {id:"turmeric",name:"turmeric",dose:"840mg",notes:"Take with food and piperine for ~20× bioavailability."},
+  {id:"dhb_dinner",name:"dihydroberberine (3rd)",dose:"500mg",notes:"DHB dose 3 of 3. Take after eating. OPTIONAL."},
+  {id:"glycine",name:"glycine",dose:"2g",notes:"Sleep quality. Mix in water before bed."},
+  {id:"magnesium",name:"magnesium glycinate",dose:"160mg",notes:"Sleep quality, muscle relaxation."},
+  {id:"taurine_pm",name:"taurine (2nd)",dose:"1g",notes:"Dose 2 of 2."},
+  {id:"melatonin",name:"melatonin",dose:"0.5mg",notes:"Sleep onset. Take 30 min before sleep."},
+];
+const PEPTIDES=[
+  {id:"hgh",name:"HGH",dose:"2→10 IU (titrating)",route:"SC",freq:"daily",site:true,notes:"Pre-bed fasted. Never within 90 min of carbs. Titrate: 2→4→6→8→10 IU. Rotate sites. OPTIONAL."},
+];
+
+const _ph=Object.fromEntries(PHARMA.map(p=>[p.id,p]));
+const _sm=Object.fromEntries(SUPPS.map(p=>[p.id,p]));
+const _pm=Object.fromEntries(PEPTIDES.map(p=>[p.id,p]));
+function res(src,id){return src==="pharma"?_ph[id]:src==="supp"?_sm[id]:_pm[id];}
+
+const SCHEDULE=[
+  {time:"breakfast",icon:"🌞",items:[
+    {src:"pharma",id:"aripiprazole"},{src:"pharma",id:"anastrozole"},
+    {src:"supp",id:"calcium_k2_d3"},{src:"supp",id:"creatine"},{src:"supp",id:"msm_boron"},
+    {src:"supp",id:"multivitamin"},{src:"supp",id:"nail_gummy"},{src:"supp",id:"omega3"},
+    {src:"supp",id:"probiotic"},{src:"supp",id:"vitd3"},
+    {src:"pharma",id:"telmisartan",opt:true},{src:"supp",id:"tudca",opt:true},{src:"supp",id:"dhb_am",opt:true},
+  ]},
+  {time:"lunch",icon:"🥗",items:[
+    {src:"supp",id:"vitc"},{src:"supp",id:"dhb_lunch",opt:true},
+  ]},
+  {time:"pre workout",icon:"💪",items:[
+    {src:"supp",id:"nac"},{src:"supp",id:"taurine_am"},
+  ]},
+  {time:"after dinner",icon:"🌃",items:[
+    {src:"supp",id:"ashwagandha"},{src:"supp",id:"eggshell"},{src:"supp",id:"glucosamine"},
+    {src:"supp",id:"turmeric"},{src:"supp",id:"glycine"},{src:"supp",id:"taurine_pm"},
+    {src:"pharma",id:"nebivolol",opt:true},{src:"supp",id:"dhb_dinner",opt:true},
+  ]},
+  {time:"bedtime",icon:"🌑",items:[
+    {src:"supp",id:"magnesium"},{src:"supp",id:"melatonin"},
+    {src:"peptide",id:"bpc157",opt:true},{src:"peptide",id:"hgh",opt:true},
+  ]},
+];
+
+const OPT_IDS=new Set(SCHEDULE.flatMap(b=>b.items.filter(i=>i.opt).map(i=>i.id)));
+const ALL_ITEMS=[...PHARMA,...SUPPS,...PEPTIDES];
+const COUNTABLE=ALL_ITEMS.filter(i=>SCHEDULE.flatMap(b=>b.items.map(x=>x.id)).includes(i.id)&&!OPT_IDS.has(i.id));
+const SITES=["Abdomen Left","Abdomen Right","Delt Left","Delt Right","Quad Left","Quad Right","Ventroglute Left","Ventroglute Right"];
+const BW=["Total Testosterone","Free Testosterone","Estradiol (E2)","IGF-1","LH","FSH","Fasting Glucose","Fasting Insulin","HOMA-IR","HbA1c","Total Cholesterol","LDL","HDL","Triglycerides","AST","ALT","GGT","TSH","Free T3","Free T4","Prolactin","SHBG","Cortisol","Calcium","PTH","Blood Pressure"];
+const CONDITIONS={anastrozole:()=>{const d=getCycleDay();return d>=0&&d%3===0;}};
+
+function Ring({pct,size=56,stroke=5}){
+  const r=(size-stroke)/2,c=2*Math.PI*r;
+  const col=pct===100?T.grn:pct>60?T.amb:T.blu;
+  return(<svg width={size} height={size} style={{transform:"rotate(-90deg)",flexShrink:0}}>
+    <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={T.surHi} strokeWidth={stroke}/>
+    <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={col} strokeWidth={stroke}
+      strokeDasharray={c} strokeDashoffset={c*(1-pct/100)} style={{transition:"stroke-dashoffset 0.4s",strokeLinecap:"round"}}/>
+  </svg>);
+}
+
+function CheckRow({id,label,dose,freq,done,onToggle,note,route,site,siteVal,onSite,opt}){
+  const [open,setOpen]=useState(false);
+  const bg=opt?T.purBg:done?T.grnBg:T.sur;
+  const bdr=opt?T.purBdr:done?T.grnBdr:T.bdr;
+  const cbBdr=opt?T.pur:done?T.grn:T.bdrHi;
+  const cbBg=opt&&done?"#6050A8":done?T.grn:"transparent";
+  const tx=opt?(done?"#8878C0":T.pur):(done?T.txD:T.tx);
+  const sub=opt?(done?"#5A4A80":"#7870A8"):(done?T.txD:T.txM);
+  return(<div style={{borderRadius:10,border:`1px solid ${bdr}`,background:bg,marginBottom:7,overflow:"hidden"}}>
+    <div style={{display:"flex",alignItems:"center",gap:10,padding:"12px",cursor:"pointer",userSelect:"none",minHeight:48}} onClick={()=>onToggle(id)}>
+      <div style={{width:22,height:22,borderRadius:5,border:`2px solid ${cbBdr}`,background:cbBg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+        {done&&<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={opt?"#E8E4FF":T.bg} strokeWidth="3.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>}
+      </div>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{color:tx,fontSize:14,fontWeight:600,textDecoration:done?"line-through":"none",lineHeight:1.3}}>{label}</div>
+        {dose&&<div style={{color:sub,fontSize:12,marginTop:2,fontWeight:500}}> {dose}</div>}
+      </div>
+      <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
+        {route==="SC"&&<span style={{background:T.ambBg,color:T.amb,border:`1px solid ${T.ambBdr}`,padding:"1px 7px",borderRadius:99,fontSize:11,fontWeight:600}}>SC</span>}
+        {note&&<button onClick={e=>{e.stopPropagation();setOpen(!open);}} style={{background:"none",border:"none",cursor:"pointer",color:open?T.acc:T.txD,padding:4,lineHeight:0}}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </button>}
+      </div>
+    </div>
+    {open&&note&&<div style={{padding:"8px 12px 12px 44px",color:T.txM,fontSize:12,lineHeight:1.65,borderTop:`1px solid ${T.bdr}`}}>{note}</div>}
+    {done&&site&&<div style={{padding:"0 12px 10px 44px"}} onClick={e=>e.stopPropagation()}>
+      <select value={siteVal||""} onChange={e=>onSite(id,e.target.value)} style={{width:"100%",background:T.bg,border:`1px solid ${T.bdr}`,color:T.txM,borderRadius:7,padding:"6px 8px",fontSize:14,outline:"none"}}>
+        <option value="">— log injection site —</option>
+        {SITES.map(s=><option key={s}>{s}</option>)}
+      </select>
+    </div>}
+  </div>);
+}
+
+function Section({title,icon,children,count,total}){
+  const [open,setOpen]=useState(true);
+  const done=total>0&&count===total;
+  return(<div style={{marginBottom:22}}>
+    <button onClick={()=>setOpen(!open)} style={{display:"flex",alignItems:"center",gap:8,width:"100%",background:"none",border:"none",cursor:"pointer",padding:"4px 2px 10px",color:T.tx,textAlign:"left",minHeight:44}}>
+      <span style={{fontSize:16}}>{icon}</span>
+      <span style={{fontWeight:800,fontSize:12,letterSpacing:"0.09em",textTransform:"uppercase",color:done?T.acc:T.txM}}>{title}</span>
+      {total>0&&<><span style={{fontSize:11,color:done?T.acc:T.txD}}>{count}/{total}</span>
+        {done&&<span style={{fontSize:10,color:T.acc,background:T.accBg,padding:"1px 6px",borderRadius:99,border:`1px solid ${T.accBdr}`,fontWeight:700}}>✓</span>}</>}
+      <svg style={{marginLeft:"auto",transform:open?"":"rotate(-90deg)",transition:"transform 0.2s",flexShrink:0}} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.txD} strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/></svg>
+    </button>
+    {open&&<div>{children}</div>}
+  </div>);
+}
+
+function CycleStatus(){
+  const d=getCycleDay(),total=150;
+  const aiOn=CONDITIONS.anastrozole();
+  return(<div style={{padding:16,borderRadius:12,border:`1px solid ${T.bdr}`,background:T.sur,marginBottom:20}}>
+    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+      <span>📅</span><span style={{fontWeight:800,fontSize:12,textTransform:"uppercase",letterSpacing:"0.08em"}}>Cycle Status</span>
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:12}}>
+      {[["Day",Math.max(0,d),"of "+total],["Week",Math.max(1,Math.ceil(Math.max(1,d)/7)),"of 22"],["Left",Math.max(0,total-d),"days"]].map(([l,v,s])=>(
+        <div key={l} style={{textAlign:"center",padding:"10px 4px",borderRadius:8,background:T.surHi,border:`1px solid ${T.bdr}`}}>
+          <div style={{color:T.txD,fontSize:9,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:3}}>{l}</div>
+          <div style={{color:T.tx,fontWeight:800,fontSize:22,lineHeight:1}}>{v}</div>
+          <div style={{color:T.txD,fontSize:9,marginTop:2}}>{s}</div>
+        </div>
+      ))}
+    </div>
+    <div style={{height:4,borderRadius:99,background:T.surHi,marginBottom:12,overflow:"hidden"}}>
+      <div style={{height:"100%",borderRadius:99,background:`linear-gradient(90deg,${T.blu},${T.acc},${T.amb})`,width:`${Math.min(100,Math.round(Math.max(0,d)/total*100))}%`}}/>
+    </div>
+    <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+      {[[aiOn?T.grn:T.amb,aiOn?T.grnBg:T.ambBg,aiOn?T.grnBdr:T.ambBdr,`anastrozole: ${aiOn?"today ✓":"off today"}`],[T.grn,T.grnBg,T.grnBdr,"HGH: nightly"]].map(([col,bg,bdr,label])=>(
+        <div key={label} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 10px",borderRadius:8,background:bg,border:`1px solid ${bdr}`}}>
+          <div style={{width:7,height:7,borderRadius:"50%",background:col}}/><span style={{fontSize:11,fontWeight:600,color:col}}>{label}</span>
+        </div>
+      ))}
+    </div>
+  </div>);
+}
+
+const SE=[
+  {id:"joint_pain",e:"🦴",l:"joint pain",a:"E2 may be crashed → reduce or hold anastrozole. Target E2 20–40 pg/mL."},
+  {id:"bloating",e:"🫃",l:"bloating",a:"E2 may be elevated → consider increasing anastrozole dose."},
+  {id:"nipple_sens",e:"⚠️",l:"nipple sensitivity",a:"High E2 / early gyno → increase anastrozole to 1mg every 3 days immediately."},
+  {id:"headache",e:"🤕",l:"headache",a:"Check BP. Hydrate. Could be HGH-related fluid retention."},
+  {id:"lethargy",e:"😴",l:"lethargy",a:"Check fasting glucose (HGH insulin resistance). Check sleep."},
+  {id:"low_libido",e:"📉",l:"low libido",a:"E2 likely crashed → reduce anastrozole."},
+  {id:"nausea",e:"🤢",l:"nausea",a:"HGH-related — ensure injecting fasted. Check magnesium dose."},
+  {id:"insomnia",e:"😳",l:"insomnia",a:"HGH injection too early or post-carb. Ensure pre-bed fasted."},
+  {id:"water_ret",e:"💦",l:"water retention",a:"High E2 or high sodium. Check anastrozole."},
+];
+
+function SideEffects({dayData,onUpdate}){
+  const sides=dayData.sides||{};
+  const [open,setOpen]=useState(false);
+  const [exp,setExp]=useState(null);
+  const toggle=id=>onUpdate({...dayData,sides:{...sides,[id]:!sides[id]}});
+  const active=SE.filter(s=>sides[s.id]);
+  return(<div style={{marginTop:24,borderRadius:12,border:`1px solid ${active.length?T.ambBdr:T.bdr}`,background:T.sur,overflow:"hidden"}}>
+    <button onClick={()=>setOpen(!open)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",padding:"14px 16px",background:"none",border:"none",cursor:"pointer",textAlign:"left",minHeight:56}}>
+      <div style={{display:"flex",alignItems:"center",gap:10}}>
+        <div style={{width:32,height:32,borderRadius:7,background:active.length?T.ambBg:T.surHi,border:`1px solid ${active.length?T.ambBdr:T.bdr}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16}}>🩺</div>
+        <div>
+          <div style={{fontWeight:700,fontSize:13}}>side effects{active.length>0&&<span style={{marginLeft:8,fontSize:10,fontWeight:600,color:T.amb,background:T.ambBg,padding:"1px 6px",borderRadius:99,border:`1px solid ${T.ambBdr}`}}>{active.length} active</span>}</div>
+          <div style={{fontSize:11,color:T.txD,marginTop:1}}>{active.length?"tap to see adjustments →":"log symptoms · get protocol adjustments"}</div>
+        </div>
+      </div>
+      <svg style={{transform:open?"rotate(180deg)":"",transition:"transform 0.2s",flexShrink:0}} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.txD} strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/></svg>
+    </button>
+    {open&&<div style={{borderTop:`1px solid ${T.bdr}`,padding:"12px 16px 16px"}}>
+      {active.length>0&&<div style={{padding:"10px 12px",borderRadius:9,background:T.ambBg,border:`1px solid ${T.ambBdr}`,marginBottom:12}}>
+        <div style={{color:T.amb,fontSize:10,fontWeight:800,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.08em"}}>⚡ active — adjustments needed</div>
+        {active.map(s=><div key={s.id} style={{fontSize:12,color:T.amb,lineHeight:1.6,marginBottom:3,paddingLeft:4,borderLeft:`2px solid ${T.ambBdr}`}}><span style={{fontWeight:700}}>{s.e} {s.l}: </span>{s.a}</div>)}
+      </div>}
+      {SE.map(s=>{
+        const on=!!sides[s.id],isExp=exp===s.id;
+        return(<div key={s.id} style={{borderRadius:9,border:`1px solid ${on?T.ambBdr:T.bdr}`,background:on?T.ambBg:T.surHi,marginBottom:6,overflow:"hidden"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 11px",minHeight:46}}>
+            <button onClick={()=>toggle(s.id)} style={{width:22,height:22,borderRadius:5,border:`2px solid ${on?T.amb:T.bdr}`,background:on?T.amb:"transparent",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+              {on&&<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={T.bg} strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>}
+            </button>
+            <span style={{flex:1,fontSize:13,fontWeight:600,color:on?T.amb:T.tx}}>{s.e} {s.l}</span>
+            <button onClick={()=>setExp(isExp?null:s.id)} style={{fontSize:11,color:isExp?T.acc:T.txD,background:"none",border:`1px solid ${isExp?T.accBdr:T.bdr}`,borderRadius:6,padding:"4px 8px",cursor:"pointer",fontWeight:600}}>{isExp?"▲":"why?"}</button>
+          </div>
+          {isExp&&<div style={{padding:"0 12px 10px 42px",fontSize:12,color:T.txM,lineHeight:1.65}}>{s.a}</div>}
+        </div>);
+      })}
+    </div>}
+  </div>);
+}
+
+function TodayTab({dayData,onUpdate,saving}){
+  const checked=dayData.checked||{};
+  const sites=dayData.sites||{};
+  const toggle=id=>onUpdate({...dayData,checked:{...checked,[id]:!checked[id]}});
+  const setSite=(id,v)=>onUpdate({...dayData,sites:{...sites,[id]:v}});
+  const visible=SCHEDULE.flatMap(b=>b.items.filter(i=>!i.opt).map(i=>res(i.src,i.id)).filter(x=>x&&(!CONDITIONS[x.id]||CONDITIONS[x.id]())));
+  const done=visible.filter(i=>checked[i.id]).length,total=visible.length;
+  const pct=total?Math.round(done/total*100):0;
+  const optDone=SCHEDULE.flatMap(b=>b.items.filter(i=>i.opt).map(i=>res(i.src,i.id)).filter(Boolean)).filter(i=>checked[i.id]).length;
+  return(<div>
+    <div style={{display:"flex",alignItems:"center",gap:16,padding:16,borderRadius:12,border:`1px solid ${pct===100?T.grnBdr:T.bdr}`,background:pct===100?T.grnBg:T.sur,marginBottom:20}}>
+      <div style={{position:"relative",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+        <Ring pct={pct} size={68} stroke={5}/><span style={{position:"absolute",fontSize:13,fontWeight:700}}>{pct}%</span>
+      </div>
+      <div style={{flex:1}}>
+        <div style={{fontWeight:700,fontSize:22,lineHeight:1}}>{done}<span style={{color:T.txD,fontWeight:400,fontSize:16}}> / {total}</span></div>
+        <div style={{color:T.txM,fontSize:13,marginTop:4}}>items completed</div>
+        {optDone>0&&<div style={{color:T.pur,fontSize:11,marginTop:2}}>{optDone} optional ✓</div>}
+      </div>
+      <div style={{textAlign:"right"}}>
+        {pct===100?<div style={{fontSize:26}}>🏆</div>:<div style={{color:T.txD,fontSize:12}}>{total-done} left</div>}
+        {saving&&<div style={{color:T.acc,fontSize:11,marginTop:4}}>saving…</div>}
+      </div>
+    </div>
+    <CycleStatus/>
+    {SCHEDULE.map(block=>{
+      const reg=block.items.filter(i=>!i.opt).map(i=>res(i.src,i.id)).filter(x=>x&&(!CONDITIONS[x.id]||CONDITIONS[x.id]()));
+      const opt=block.items.filter(i=>i.opt).map(i=>({...res(i.src,i.id),opt:true})).filter(x=>x&&x.id);
+      if(!reg.length&&!opt.length) return null;
+      return(<Section key={block.time} title={block.time} icon={block.icon} count={reg.filter(i=>checked[i.id]).length} total={reg.length}>
+        {reg.map(p=><CheckRow key={p.id} id={p.id} label={p.name} dose={p.dose||""} freq={p.freq||""} done={!!checked[p.id]} onToggle={toggle} note={p.notes} route={p.route} site={!!p.site} siteVal={sites[p.id]} onSite={setSite}/>)}
+        {opt.length>0&&<>
+          {reg.length>0&&<div style={{display:"flex",alignItems:"center",gap:8,margin:"10px 0 6px",opacity:0.6}}>
+            <div style={{flex:1,height:"1px",background:T.purBdr}}/>
+            <span style={{fontSize:9,color:T.pur,fontWeight:700,letterSpacing:"0.07em",textTransform:"uppercase"}}>optional</span>
+            <div style={{flex:1,height:"1px",background:T.purBdr}}/>
+          </div>}
+          {opt.map(p=><CheckRow key={p.id} id={p.id} label={p.name} dose={p.dose||""} freq={p.freq||""} done={!!checked[p.id]} onToggle={toggle} note={p.notes} route={p.route} site={!!p.site} siteVal={sites[p.id]} onSite={setSite} opt/>)}
+        </>}
+      </Section>);
+    })}
+    <SideEffects dayData={dayData} onUpdate={onUpdate}/>
+  </div>);
+}
+
+function MiniChart({lines,height=150}){
+  const allPts=lines.flatMap(l=>l.data);
+  if(!allPts.length) return null;
+  const vals=allPts.map(p=>p.val),mn=Math.min(...vals),mx=Math.max(...vals);
+  const pad=Math.max((mx-mn)*0.15,2),lo=mn-pad,hi=mx+pad;
+  const dates=[...new Set(allPts.map(p=>p.date))].sort();
+  const W=380,pL=38,pR=14,pT=14,pB=28,iW=W-pL-pR,iH=height-pT-pB;
+  const sx=d=>{const i=dates.indexOf(d);return pL+(dates.length<=1?iW/2:(i/(dates.length-1))*iW);};
+  const sy=v=>pT+iH-((v-lo)/(hi-lo))*iH;
+  const gv=Array.from({length:5},(_,i)=>lo+(i/4)*(hi-lo));
+  const sd=dates.filter((_,i,a)=>a.length<=5||i===0||i===a.length-1||i%Math.ceil(a.length/4)===0);
+  return(<svg viewBox={`0 0 ${W} ${height}`} style={{width:"100%",height:"auto",overflow:"visible",display:"block"}}>
+    {gv.map((v,i)=><g key={i}>
+      <line x1={pL} x2={W-pR} y1={sy(v)} y2={sy(v)} stroke={T.bdr} strokeWidth="0.7" strokeDasharray={i?"3,4":""}/>
+      <text x={pL-5} y={sy(v)+4} textAnchor="end" fill={T.txD} fontSize="11" fontFamily="Outfit,sans-serif">{Number.isInteger(v)?v:v.toFixed(1)}</text>
+    </g>)}
+    {lines.map(line=>{
+      if(!line.data.length) return null;
+      if(line.data.length===1) return <circle key={line.l} cx={sx(line.data[0].date)} cy={sy(line.data[0].val)} r={4} fill={line.col} stroke={T.bg} strokeWidth="1.5"/>;
+      const dp=line.data.map((p,i)=>`${i?"L":"M"}${sx(p.date)},${sy(p.val)}`).join(" ");
+      return(<g key={line.l}>
+        <path d={dp} fill="none" stroke={line.col} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" opacity="0.9"/>
+        {line.data.map((p,i)=><g key={i}>
+          <circle cx={sx(p.date)} cy={sy(p.val)} r={4} fill={line.col} stroke={T.bg} strokeWidth="1.5"/>
+          {i===line.data.length-1&&<text x={sx(p.date)+7} y={sy(p.val)+4} fill={line.col} fontSize="11" fontFamily="Outfit,sans-serif" fontWeight="700">{Number.isInteger(p.val)?p.val:p.val.toFixed(1)}</text>}
+        </g>)}
+      </g>);
+    })}
+    {sd.map(d=><text key={d} x={sx(d)} y={height-3} textAnchor="middle" fill={T.txD} fontSize="10" fontFamily="Outfit,sans-serif">{new Date(d+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric"})}</text>)}
+  </svg>);
+}
+
+function GCard({title,icon,children,empty}){
+  return(<div style={{padding:16,borderRadius:12,border:`1px solid ${T.bdr}`,background:T.sur,marginBottom:16}}>
+    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:children?14:0}}>
+      <span style={{fontSize:16}}>{icon}</span>
+      <span style={{fontWeight:800,fontSize:13,textTransform:"uppercase",letterSpacing:"0.07em"}}>{title}</span>
+    </div>
+    {children||<div style={{textAlign:"center",padding:"28px 0",color:T.txD,fontSize:12}}><div style={{fontSize:24,marginBottom:8,opacity:0.4}}>📈</div>{empty}</div>}
+  </div>);
+}
+
+function GraphsTab({history,dayData,onUpdate}){
+  const [w,setW]=useState(dayData.weight||"");
+  const [bp,setBp]=useState(dayData.bp||"");
+  const [g,setG]=useState(dayData.glucose||"");
+  const [flash,setFlash]=useState(false);
+  useEffect(()=>{setW(dayData.weight||"");setBp(dayData.bp||"");setG(dayData.glucose||"");},[dayData]);
+  const save=()=>{onUpdate({...dayData,weight:w,bp,glucose:g});setFlash(true);setTimeout(()=>setFlash(false),2000);};
+  const ii={background:T.bg,border:`1px solid ${T.bdr}`,color:T.tx,borderRadius:8,padding:"10px",fontSize:16,outline:"none",width:"100%"};
+  const dates=Object.keys(history).filter(d=>d>=CYCLE_START).sort();
+  const pN=s=>{const n=parseFloat(s);return isNaN(n)?null:n;};
+  const pBP=s=>{if(!s)return{sys:null,dia:null};const p=s.split(/[\/\-]/);return p.length<2?{sys:null,dia:null}:{sys:parseFloat(p[0]),dia:parseFloat(p[1])};};
+  const wts=dates.map(d=>({date:d,val:pN(history[d].weight)})).filter(d=>d.val!=null);
+  const glc=dates.map(d=>({date:d,val:pN(history[d].glucose)})).filter(d=>d.val!=null);
+  const bpa=dates.map(d=>({date:d,...pBP(history[d].bp)})).filter(d=>d.sys!=null&&!isNaN(d.sys));
+  const bSys=bpa.map(d=>({date:d.date,val:d.sys})),bDia=bpa.map(d=>({date:d.date,val:d.dia}));
+  const lat=(a,f)=>a.length?f(a[a.length-1].val):"—";
+  return(<div>
+    <div style={{padding:16,borderRadius:12,border:`1px solid ${T.bdr}`,background:T.sur,marginBottom:20}}>
+      <div style={{color:T.txM,fontSize:11,fontWeight:700,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:14}}>📊 daily measurements</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:14}}>
+        {[["⚖️ weight (kg)",w,setW,"e.g. 75.2"],["❤️ blood pressure",bp,setBp,"e.g. 118/76"],["🩸 glucose (mg/dL)",g,setG,"e.g. 88"]].map(([l,v,s,ph])=>(
+          <div key={l}><label style={{color:T.txM,fontSize:10,fontWeight:600,display:"block",marginBottom:5}}>{l}</label><input value={v} onChange={e=>s(e.target.value)} placeholder={ph} style={ii}/></div>
+        ))}
+      </div>
+      <button onClick={save} style={{width:"100%",padding:"14px 0",borderRadius:10,border:"none",cursor:"pointer",fontWeight:700,fontSize:15,background:flash?T.grn:T.acc,color:T.bg,transition:"background 0.3s"}}>{flash?"✓ saved!":"save log"}</button>
+    </div>
+    <GCard title="Weight" icon="⚖️" empty="Log weight above to see graph">
+      {wts.length?<>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:8}}>
+          <div><span style={{color:T.txD,fontSize:11}}>Latest: </span><span style={{color:T.blu,fontWeight:700,fontSize:14}}>{lat(wts,v=>v.toFixed(1)+" kg")}</span></div>
+          {wts.length>1&&<div><span style={{color:T.txD,fontSize:11}}>Change: </span><span style={{color:(wts[wts.length-1].val-wts[0].val)<0?T.grn:T.ros,fontWeight:700,fontSize:13}}>{((wts[wts.length-1].val-wts[0].val)>=0?"+":"")+(wts[wts.length-1].val-wts[0].val).toFixed(1)+"kg"}</span></div>}
+        </div>
+        <MiniChart lines={[{data:wts,col:T.blu,l:"w"}]} height={150}/>
+      </>:null}
+    </GCard>
+    <GCard title="Blood Pressure" icon="❤️" empty="Log BP (e.g. 118/76) above">
+      {bSys.length?<>
+        <div style={{display:"flex",gap:16,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
+          <div>
+            {[[T.ros,"Systolic",lat(bSys,v=>Math.round(v)+" mmHg")],[T.amb,"Diastolic",lat(bDia,v=>Math.round(v)+" mmHg")]].map(([c,l,v])=>(
+              <div key={l} style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
+                <div style={{width:8,height:8,borderRadius:2,background:c}}/><span style={{fontSize:11,color:T.txD}}>{l}</span><span style={{fontSize:13,fontWeight:700,color:c}}>{v}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{padding:"5px 10px",borderRadius:8,background:T.surHi,border:`1px solid ${T.bdr}`,fontSize:11,color:T.txM}}>Target: <span style={{fontWeight:600}}>{"<120/80"}</span></div>
+        </div>
+        <MiniChart lines={[{data:bSys,col:T.ros,l:"s"},{data:bDia,col:T.amb,l:"d"}]} height={150}/>
+      </>:null}
+    </GCard>
+    <GCard title="Fasting Glucose" icon="🩸" empty="Log glucose (mg/dL) above">
+      {glc.length?<>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12,flexWrap:"wrap",gap:8}}>
+          <div><span style={{color:T.txD,fontSize:11}}>Latest: </span><span style={{color:T.amb,fontWeight:700,fontSize:14}}>{lat(glc,v=>Math.round(v)+" mg/dL")}</span></div>
+          <div style={{padding:"4px 10px",borderRadius:8,background:T.surHi,border:`1px solid ${T.bdr}`,fontSize:11,color:T.txM}}>Target: <span style={{fontWeight:600}}>{"<90"}</span></div>
+        </div>
+        <MiniChart lines={[{data:glc,col:T.amb,l:"g"}]} height={150}/>
+      </>:null}
+    </GCard>
+  </div>);
+}
+
+function HistoryTab({history}){
+  const days=Object.keys(history).filter(d=>d>=CYCLE_START).sort().reverse().slice(0,60);
+  if(!days.length) return(<div style={{textAlign:"center",padding:"60px 20px",color:T.txM}}><div style={{fontSize:36,marginBottom:10}}>📅</div><div>no history yet — start checking items in today!</div></div>);
+  return(<div>{days.map(day=>{
+    const [exp,setExp]=useState(false);
+    const d=history[day],c=d.checked||{};
+    const n=COUNTABLE.filter(i=>c[i.id]).length,p=COUNTABLE.length?Math.round(n/COUNTABLE.length*100):0;
+    const cDay=Math.floor((new Date(day+"T12:00:00")-new Date(CYCLE_START+"T00:00:00"))/86400000);
+    return(<div key={day} style={{borderRadius:10,border:`1px solid ${T.bdr}`,background:T.sur,marginBottom:10,overflow:"hidden"}}>
+      <div style={{padding:12}}>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <div style={{position:"relative",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            <Ring pct={p} size={44} stroke={4}/><span style={{position:"absolute",fontSize:10,fontWeight:700}}>{p}%</span>
+          </div>
+          <div style={{flex:1}}>
+            <div style={{fontSize:14,fontWeight:600}}>{new Date(day+"T12:00:00").toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})}<span style={{color:T.acc,fontSize:11,fontWeight:700,marginLeft:8}}>Day {cDay}</span></div>
+            <div style={{color:T.txM,fontSize:12}}>{n}/{COUNTABLE.length} completed</div>
+          </div>
+          <div style={{textAlign:"right",fontSize:11,color:T.txM,lineHeight:1.9,flexShrink:0}}>
+            {d.weight&&<div>⚖️ {d.weight}kg</div>}{d.bp&&<div>❤️ {d.bp}</div>}{d.glucose&&<div>🩸 {d.glucose}</div>}
+          </div>
+        </div>
+        <button onClick={()=>setExp(!exp)} style={{marginTop:10,width:"100%",background:T.surHi,border:`1px solid ${T.bdr}`,borderRadius:7,padding:"7px 0",color:T.txM,fontSize:11,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>
+          <svg style={{transform:exp?"rotate(180deg)":"",transition:"transform 0.2s"}} width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/></svg>
+          {exp?"hide":"show"} taken / missed
+        </button>
+      </div>
+      {exp&&<div style={{borderTop:`1px solid ${T.bdr}`,padding:"10px 12px"}}>
+        {[["taken",COUNTABLE.filter(i=>c[i.id]),T.grn,T.grnBg,T.grnBdr,"✓"],["missed",COUNTABLE.filter(i=>!c[i.id]),T.ros,T.rosBg,T.rosBdr,"✗"]].map(([lbl,items,col,bg,bdr,sym])=>items.length?<div key={lbl} style={{marginBottom:8}}>
+          <div style={{color:col,fontSize:10,fontWeight:700,letterSpacing:"0.07em",textTransform:"uppercase",marginBottom:5}}>{sym} {lbl} ({items.length})</div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:"3px 5px"}}>{items.map(i=><span key={i.id} style={{background:bg,border:`1px solid ${bdr}`,color:col,fontSize:10,padding:"2px 7px",borderRadius:99}}>{i.name}</span>)}</div>
+        </div>:null)}
+      </div>}
+    </div>);
+  })}</div>);
+}
+
+function LabsTab({bloodwork,onSave}){
+  const [date,setDate]=useState(getToday());
+  const [vals,setVals]=useState({});
+  const [flash,setFlash]=useState(false);
+  useEffect(()=>setVals(bloodwork[date]||{}),[date,bloodwork]);
+  const save=()=>{onSave(date,vals);setFlash(true);setTimeout(()=>setFlash(false),2000);};
+  const ii={background:T.bg,border:`1px solid ${T.bdr}`,color:T.tx,borderRadius:6,padding:"5px 8px",fontSize:16,outline:"none",width:88,textAlign:"right"};
+  return(<div>
+    <div style={{display:"flex",alignItems:"center",gap:10,padding:12,borderRadius:10,border:`1px solid ${T.bdr}`,background:T.sur,marginBottom:14}}>
+      <span style={{color:T.txM,fontSize:13}}>Date</span>
+      <input type="date" value={date} onChange={e=>setDate(e.target.value)} style={{flex:1,background:T.bg,border:`1px solid ${T.bdr}`,color:T.tx,borderRadius:7,padding:"8px",fontSize:16,outline:"none"}}/>
+    </div>
+    <div style={{marginBottom:14,display:"grid",gridTemplateColumns:"1fr 1fr",gap:4}}>
+      {BW.map(m=><div key={m} style={{display:"flex",alignItems:"center",gap:6,padding:"7px 10px",borderRadius:7,background:T.sur,border:`1px solid ${T.bdr}`,minHeight:44}}>
+        <span style={{fontSize:12,flex:1}}>{m}</span>
+        <input value={vals[m]||""} onChange={e=>setVals(v=>({...v,[m]:e.target.value}))} placeholder="—" style={ii}/>
+      </div>)}
+    </div>
+    <button onClick={save} style={{width:"100%",padding:"14px 0",borderRadius:10,border:"none",cursor:"pointer",fontWeight:700,fontSize:15,background:flash?T.grn:T.acc,color:T.bg,marginBottom:20,transition:"background 0.3s"}}>{flash?"✓ Saved!":"Save Labs"}</button>
+    {Object.keys(bloodwork).sort().reverse().map(d=><div key={d} style={{padding:12,borderRadius:10,border:`1px solid ${T.bdr}`,background:T.sur,marginBottom:8}}>
+      <div style={{color:"#8BADC0",fontSize:12,fontWeight:700,marginBottom:8}}>{new Date(d+"T12:00:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"2px 16px"}}>
+        {Object.entries(bloodwork[d]).filter(([,v])=>v).map(([k,v])=><div key={k} style={{fontSize:12}}><span style={{color:T.txM}}>{k}: </span>{v}</div>)}
+      </div>
+    </div>)}
+  </div>);
+}
+
+function NotesTab(){
+  const c={padding:16,borderRadius:12,border:`1px solid ${T.bdr}`,background:T.sur,marginBottom:14};
+  const r=(t,b,i)=><div key={i} style={{marginBottom:9,paddingBottom:9,borderBottom:`1px solid ${T.bdr}`,fontSize:13,lineHeight:1.65}}><div style={{fontWeight:700,marginBottom:2}}>{t}</div><div style={{color:T.txM}}>{b}</div></div>;
+  const sl=t=><div style={{color:T.acc,fontSize:9,fontWeight:700,letterSpacing:"0.09em",textTransform:"uppercase",marginBottom:5,marginTop:12}}>{t}</div>;
+  const dot=(col,t)=><div key={t} style={{display:"flex",gap:7,fontSize:12,color:T.txM,marginBottom:3}}><span style={{color:col,flexShrink:0}}>•</span><span>{t}</span></div>;
+  return(<div>
+    <div style={{...c,border:`1px solid ${T.accBdr}`}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}><span style={{fontSize:17}}>📋</span><span style={{fontWeight:800,fontSize:14}}>Current Stack</span></div>
+      {[["BREAKFAST 🌞",["Aripiprazole — 5mg","Calcium | K2 | D3 — 600mg | 180mcg | 1000 IU","Creatine — 5g","MSM | Boron — 750mg | 6mg","Multivitamin — 1 tablet","Nail Gummy — 1 gummy","Omega-3 | EPA | DHA — 1500mg | 540mg | 360mg","Probiotic — 30B CFU","Vitamin D3 additional — 2000 IU","[Optional] Telmisartan — 40mg if BP elevated","[Optional] TUDCA — 500mg","[Optional] DHB (1st) — 500mg after eating"]],
+        ["LUNCH 🥗",["Liposomal Vitamin C — 1000mg","Anastrozole — 0.5mg every 3 days (Day 0, 3, 6…)","[Optional] DHB (2nd) — 500mg after eating"]],
+        ["PRE WORKOUT 💪",["NAC — 1000mg","Taurine (1st) — 1g"]],
+        ["DINNER 🌃",["Ashwagandha — 300mg","Eggshell Powder — ~450mg","Glucosamine — 1500mg","Turmeric — 840mg (with piperine)","[Optional] Nebivolol — 2.5mg if BP/HR elevated","[Optional] DHB (3rd) — 500mg after eating"]],
+        ["PRE BED 🌑",["Glycine — 2g","Magnesium Glycinate — 160mg","Taurine (2nd) — 1g","[Optional] BPC-157 — 500mcg SC","[Optional] HGH — 2→10 IU SC (fasted, pre-bed only)"]],
+      ].map(([s,items])=><div key={s}>{sl(s)}{items.map(item=>dot(item.startsWith("[Optional]")?T.pur:T.grn,item))}</div>)}
+    </div>
+    <div style={c}>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}><span style={{fontSize:17}}>💉</span><span style={{fontWeight:800,fontSize:14}}>SC Injection Guide</span></div>
+      {[["HGH — pre-bed fasted","29–31G insulin syringe, 45°, pinch 1–2cm skin. Inject slowly. ALWAYS fasted — never within 90 min of carbs. Titrate: 2→4→6→8→10 IU. Rotate sites."],["BPC-157 — as needed","Same SC technique. Inject near problem area. Rotate sites."],["Reconstitution","Add bacteriostatic water slowly down vial wall. Swirl gently, never shake. Fridge 2–8°C. Use within 30 days."],["Site rotation","Abdomen L → Abdomen R → Thigh L → Thigh R → repeat"]].map(([t,b],i)=>r(t,b,i))}
+    </div>
+    <div style={c}>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}><span style={{fontSize:17}}>🔑</span><span style={{fontWeight:800,fontSize:14}}>Protocol Rules</span></div>
+      {[["E2 target","20–40 pg/mL. Joint pain/low libido = crashed E2 → reduce anastrozole. Bloating/nipple sensitivity = high E2 → increase dose."],["Anastrozole","0.5mg every 3 days — Day 0, 3, 6, 9… Auto-shown in tracker."],["HGH protocol","Always pre-bed fasted. Never within 90 min of carbs. Titrating 2→10 IU. Rotate sites."],["DHB timing","Take AFTER meals — never before. Pre-meal dosing risks hypoglycemia."],["Fasting glucose","Target <90 mg/dL. HGH increases insulin resistance. DHB 3× daily after meals helps."],["Bloodwork at 6 weeks","IGF-1, testosterone panel, E2, LH, FSH, fasting glucose + insulin, HOMA-IR, CBC, CMP, lipids, thyroid, prolactin, SHBG, cortisol, calcium, PTH."],["Liver monitoring","TUDCA 500mg daily + NAC 1000mg pre-workout. AST/ALT at 6-week bloodwork. Zero alcohol."]].map(([t,b],i)=>r(t,b,i))}
+    </div>
+  </div>);
+}
+
+const TABS=[{id:"today",l:"Today",i:"✅"},{id:"graphs",l:"Graphs",i:"📊"},{id:"history",l:"History",i:"📆"},{id:"labs",l:"Labs",i:"🩸"},{id:"notes",l:"Notes",i:"🖊️"}];
+
+function App(){
+  const [tab,setTab]=useState("today");
+  const [saving,setSaving]=useState(false);
+  const [flash,setFlash]=useState(false);
+  const [err,setErr]=useState(false);
+  const [history,setHistory]=useState(()=>{const r=sGet("history")||{};return Object.fromEntries(Object.entries(r).filter(([d])=>d>=CYCLE_START));});
+  const [bloodwork,setBloodwork]=useState(()=>{const s=sGet("bloodwork");return s&&Object.keys(s).length?s:{};});
+  const today=getToday();
+  const updateDay=useCallback(data=>{
+    setSaving(true);
+    const next={...history,[today]:data};
+    setHistory(next);
+    setTimeout(()=>{const ok=sSet("history",next);setSaving(false);if(ok){setErr(false);setFlash(true);setTimeout(()=>setFlash(false),1200);}else setErr(true);},0);
+  },[history,today]);
+  const saveLabs=useCallback((date,vals)=>{const next={...bloodwork,[date]:vals};setBloodwork(next);if(!sSet("bloodwork",next))setErr(true);},[bloodwork]);
+  const todayData=history[today]||{};
+  const vis=SCHEDULE.flatMap(b=>b.items.filter(i=>!i.opt).map(i=>res(i.src,i.id)).filter(x=>x&&(!CONDITIONS[x.id]||CONDITIONS[x.id]())));
+  const pct=vis.length?Math.round(vis.filter(i=>(todayData.checked||{})[i.id]).length/vis.length*100):0;
+  return(<div style={{minHeight:"100vh",background:T.bg}}>
+    <div style={{position:"sticky",top:0,zIndex:20,background:"rgba(17,25,32,0.96)",backdropFilter:"blur(14px)",borderBottom:`1px solid ${T.bdr}`,padding:"10px 16px",paddingTop:"calc(10px + env(safe-area-inset-top,0px))"}}>
+      <div style={{maxWidth:770,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <span style={{fontSize:24}}>🌟</span>
+          <div>
+            <div style={{fontWeight:800,fontSize:16,letterSpacing:"-0.02em",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+              Jordan's Protocol
+              <span style={{fontSize:11,fontWeight:600,color:T.acc,background:T.accBg,padding:"2px 9px",borderRadius:99,border:`1px solid ${T.accBdr}`}}>Day {Math.max(0,getCycleDay())}</span>
+            </div>
+            <div style={{fontSize:11,marginTop:2,color:err?T.ros:flash?T.grn:T.txD}}>{err?"⚠️ save failed":flash?"✓ saved":new Date(today+"T12:00:00").toLocaleDateString("en-US",{weekday:"long",month:"short",day:"numeric"})}</div>
+          </div>
+        </div>
+        <div style={{position:"relative",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+          <Ring pct={pct} size={46} stroke={4}/><span style={{position:"absolute",fontSize:11,fontWeight:700}}>{pct}%</span>
+        </div>
+      </div>
+    </div>
+    <div style={{maxWidth:770,margin:"0 auto",padding:"18px 16px 110px"}}>
+      {tab==="today"  &&<TodayTab dayData={todayData} onUpdate={updateDay} saving={saving}/>}
+      {tab==="graphs" &&<GraphsTab history={history} dayData={todayData} onUpdate={updateDay}/>}
+      {tab==="history"&&<HistoryTab history={history}/>}
+      {tab==="labs"   &&<LabsTab bloodwork={bloodwork} onSave={saveLabs}/>}
+      {tab==="notes"  &&<NotesTab/>}
+    </div>
+    <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:20,background:"rgba(17,25,32,0.97)",backdropFilter:"blur(14px)",borderTop:`1px solid ${T.bdr}`,padding:`5px 10px calc(6px + env(safe-area-inset-bottom,0px))`}}>
+      <div style={{maxWidth:770,margin:"0 auto",display:"flex",justifyContent:"space-around"}}>
+        {TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"6px 4px",borderRadius:9,border:"none",cursor:"pointer",flex:1,minHeight:48,background:tab===t.id?T.accBg:"transparent",color:tab===t.id?T.acc:T.txD,transition:"all 0.15s"}}>
+          <span style={{fontSize:17,lineHeight:1}}>{t.i}</span><span style={{fontSize:9,fontWeight:600}}>{t.l}</span>
+        </button>)}
+      </div>
+    </div>
+  </div>);
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
