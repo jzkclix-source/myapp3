@@ -19,11 +19,12 @@ button{touch-action:manipulation}
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const {useState,useEffect,useCallback}=React;
+const {useState,useEffect,useCallback,useRef}=React;
 const T={bg:"#111920",sur:"#18242C",surHi:"#1E2E38",bdr:"#273848",bdrHi:"#354F62",
   tx:"#E8E0D8",txM:"#8AAAB8",txD:"#4E6A7A",
   acc:"#6DB8AE",accBg:"#102624",accBdr:"#2E6A5E",
   grn:"#6DB8AE",grnBg:"#0E2422",grnBdr:"#2E6A5E",
+  org:"#FF8000",orgBg:"#200E00",orgBdr:"#994000",
   amb:"#C8905A",ambBg:"#2A1C0C",ambBdr:"#7A4620",
   ros:"#C07070",rosBg:"#2A1616",rosBdr:"#6A3030",
   blu:"#5EA8D0",bluBg:"#0C1E30",bluBdr:"#2A5A7A",
@@ -43,10 +44,10 @@ function getCycleDay(){
 }
 
 const PHARMA=[
-  {id:"aripiprazole",name:"aripiprazole",dose:"5mg",route:"oral",freq:"daily",notes:"Take with breakfast."},
-  {id:"anastrozole",name:"anastrozole",dose:"0.5mg",route:"oral",freq:"every 3 days (day 0, 3, 6…)",notes:"Auto-shown on correct days. E2 target 20–40 pg/mL."},
-  {id:"nebivolol",name:"nebivolol",dose:"2.5mg",route:"oral",freq:"if needed",notes:"Beta-1 blocker. Take if BP or HR elevated. OPTIONAL."},
-  {id:"telmisartan",name:"telmisartan",dose:"40mg",route:"oral",freq:"as needed",notes:"ARB. Use only if BP chronically elevated. OPTIONAL."},
+  {id:"aripiprazole",name:"aripiprazole",dose:"5mg",notes:"Take with breakfast."},
+  {id:"anastrozole",name:"anastrozole",dose:"0.5mg",notes:"Auto-shown every 3 days (Day 0, 3, 6…). E2 target 20–40 pg/mL."},
+  {id:"nebivolol",name:"nebivolol",dose:"2.5mg",notes:"Beta-1 blocker. Take if BP or HR elevated. OPTIONAL."},
+  {id:"telmisartan",name:"telmisartan",dose:"40mg",notes:"ARB. Use only if BP chronically elevated. OPTIONAL."},
 ];
 const SUPPS=[
   {id:"calcium_k2_d3",name:"calcium | k2 | d3",dose:"600mg | 180mcg | 1000 IU",notes:"Take with fat. K2 directs calcium to bones."},
@@ -57,14 +58,14 @@ const SUPPS=[
   {id:"omega3",name:"omega-3 | epa | dha",dose:"1500mg | 540mg | 360mg",notes:"Cardiovascular, anti-inflammatory, lipid management."},
   {id:"probiotic",name:"probiotic",dose:"30b cfu",notes:"Gut microbiome support."},
   {id:"vitd3",name:"vitamin d3 additional",dose:"2000iu",notes:"Take with fat. Immune, hormonal, bone support."},
-  {id:"tudca",name:"TUDCA",dose:"500mg",notes:"Hepatoprotective. Critical liver support on HGH protocol."},
+  {id:"tudca",name:"TUDCA",dose:"500mg",notes:"Hepatoprotective. Critical liver support on HGH protocol. OPTIONAL."},
   {id:"dhb_am",name:"dihydroberberine (1st)",dose:"500mg",notes:"Blood glucose control. Take AFTER eating. OPTIONAL."},
   {id:"vitc",name:"liposomal vitamin c",dose:"1000mg",notes:"Superior absorption. Collagen synthesis, antioxidant."},
   {id:"dhb_lunch",name:"dihydroberberine (2nd)",dose:"500mg",notes:"DHB dose 2 of 3. Take after eating. OPTIONAL."},
   {id:"nac",name:"NAC",dose:"1000mg",notes:"Antioxidant, liver support, glutathione precursor."},
   {id:"taurine_am",name:"taurine (1st)",dose:"1g",notes:"Cardiac support, insulin sensitivity. Dose 1 of 2."},
-  {id:"ashwagandha",name:"ashwaghanda",dose:"~300mg",notes:"Adaptogen, cortisol reduction, sleep support. Take with food."},
-  {id:"eggshell",name:"eggshell powder",dose:"~450mg",notes:"~450mg calcium carbonate per serving."},
+  {id:"ashwagandha",name:"ashwagandha",dose:"300mg",notes:"Adaptogen, cortisol reduction, sleep support. Take with food."},
+  {id:"eggshell",name:"eggshell powder",dose:"~450mg",notes:"Calcium carbonate per serving."},
   {id:"glucosamine",name:"glucosamine",dose:"1500mg",notes:"Cartilage and joint support. Take with food."},
   {id:"turmeric",name:"turmeric",dose:"840mg",notes:"Take with food and piperine for ~20× bioavailability."},
   {id:"dhb_dinner",name:"dihydroberberine (3rd)",dose:"500mg",notes:"DHB dose 3 of 3. Take after eating. OPTIONAL."},
@@ -74,7 +75,8 @@ const SUPPS=[
   {id:"melatonin",name:"melatonin",dose:"0.5mg",notes:"Sleep onset. Take 30 min before sleep."},
 ];
 const PEPTIDES=[
-  {id:"hgh",name:"HGH",dose:"2→10 IU (titrating)",route:"SC",freq:"daily",site:true,notes:"Pre-bed fasted. Never within 90 min of carbs. Titrate: 2→4→6→8→10 IU. Rotate sites. OPTIONAL."},
+  {id:"hgh",name:"HGH",dose:"2→10 IU (titrating)",route:"SC",site:true,notes:"Pre-bed fasted. Never within 90 min of carbs. Titrate: 2→4→6→8→10 IU. Rotate sites. OPTIONAL."},
+  {id:"bpc157",name:"BPC-157",dose:"500mcg",route:"SC",site:true,notes:"Inject near problem area. OPTIONAL."},
 ];
 
 const _ph=Object.fromEntries(PHARMA.map(p=>[p.id,p]));
@@ -83,25 +85,25 @@ const _pm=Object.fromEntries(PEPTIDES.map(p=>[p.id,p]));
 function res(src,id){return src==="pharma"?_ph[id]:src==="supp"?_sm[id]:_pm[id];}
 
 const SCHEDULE=[
-  {time:"breakfast",icon:"🌞",items:[
+  {time:"BREAKFAST",icon:"🌞",items:[
     {src:"pharma",id:"aripiprazole"},{src:"pharma",id:"anastrozole"},
     {src:"supp",id:"calcium_k2_d3"},{src:"supp",id:"creatine"},{src:"supp",id:"msm_boron"},
     {src:"supp",id:"multivitamin"},{src:"supp",id:"nail_gummy"},{src:"supp",id:"omega3"},
     {src:"supp",id:"probiotic"},{src:"supp",id:"vitd3"},
     {src:"pharma",id:"telmisartan",opt:true},{src:"supp",id:"tudca",opt:true},{src:"supp",id:"dhb_am",opt:true},
   ]},
-  {time:"lunch",icon:"🥗",items:[
+  {time:"LUNCH",icon:"🥗",items:[
     {src:"supp",id:"vitc"},{src:"supp",id:"dhb_lunch",opt:true},
   ]},
-  {time:"pre workout",icon:"💪",items:[
+  {time:"PRE-WORKOUT",icon:"💪",items:[
     {src:"supp",id:"nac"},{src:"supp",id:"taurine_am"},
   ]},
-  {time:"after dinner",icon:"🌃",items:[
+  {time:"DINNER",icon:"🌃",items:[
     {src:"supp",id:"ashwagandha"},{src:"supp",id:"eggshell"},{src:"supp",id:"glucosamine"},
     {src:"supp",id:"turmeric"},{src:"supp",id:"glycine"},{src:"supp",id:"taurine_pm"},
     {src:"pharma",id:"nebivolol",opt:true},{src:"supp",id:"dhb_dinner",opt:true},
   ]},
-  {time:"bedtime",icon:"🌑",items:[
+  {time:"PRE-BED",icon:"🌑",items:[
     {src:"supp",id:"magnesium"},{src:"supp",id:"melatonin"},
     {src:"peptide",id:"bpc157",opt:true},{src:"peptide",id:"hgh",opt:true},
   ]},
@@ -114,6 +116,14 @@ const SITES=["Abdomen Left","Abdomen Right","Delt Left","Delt Right","Quad Left"
 const BW=["Total Testosterone","Free Testosterone","Estradiol (E2)","IGF-1","LH","FSH","Fasting Glucose","Fasting Insulin","HOMA-IR","HbA1c","Total Cholesterol","LDL","HDL","Triglycerides","AST","ALT","GGT","TSH","Free T3","Free T4","Prolactin","SHBG","Cortisol","Calcium","PTH","Blood Pressure"];
 const CONDITIONS={anastrozole:()=>{const d=getCycleDay();return d>=0&&d%3===0;}};
 
+function initOverrides(){return sGet("overrides")||{items:{},custom:{}};}
+function applyOvr(item,ovr){
+  if(!item)return null;
+  const o=ovr.items[item.id]||{};
+  if(o.deleted)return null;
+  return{...item,name:o.name||item.name,dose:o.dose!==undefined?o.dose:item.dose};
+}
+
 function Ring({pct,size=56,stroke=5}){
   const r=(size-stroke)/2,c=2*Math.PI*r;
   const col=pct===100?T.grn:pct>60?T.amb:T.blu;
@@ -124,22 +134,77 @@ function Ring({pct,size=56,stroke=5}){
   </svg>);
 }
 
-function CheckRow({id,label,dose,freq,done,onToggle,note,route,site,siteVal,onSite,opt}){
+function Modal({title,onClose,children}){
+  return(<div style={{position:"fixed",inset:0,zIndex:100,background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={onClose}>
+    <div style={{background:T.sur,borderRadius:"18px 18px 0 0",padding:24,width:"100%",maxWidth:520,border:`1px solid ${T.bdr}`}} onClick={e=>e.stopPropagation()}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
+        <span style={{fontWeight:800,fontSize:16}}>{title}</span>
+        <button onClick={onClose} style={{background:T.surHi,border:`1px solid ${T.bdr}`,color:T.txM,borderRadius:8,padding:"4px 10px",cursor:"pointer",fontSize:13}}>✕</button>
+      </div>
+      {children}
+    </div>
+  </div>);
+}
+
+function EditModal({item,isCustom,onSave,onDelete,onClose}){
+  const [name,setName]=useState(item.name);
+  const [dose,setDose]=useState(item.dose||"");
+  const inp={background:T.bg,border:`1px solid ${T.bdr}`,color:T.tx,borderRadius:9,padding:"12px",fontSize:15,outline:"none",width:"100%",marginBottom:12};
+  return(<Modal title="Edit Item" onClose={onClose}>
+    <div style={{color:T.txD,fontSize:11,fontWeight:600,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.07em"}}>Name</div>
+    <input value={name} onChange={e=>setName(e.target.value)} style={inp} placeholder="Item name"/>
+    <div style={{color:T.txD,fontSize:11,fontWeight:600,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.07em"}}>Dose</div>
+    <input value={dose} onChange={e=>setDose(e.target.value)} style={{...inp,marginBottom:20}} placeholder="e.g. 5mg"/>
+    <button onClick={()=>onSave(name.trim(),dose.trim())} style={{width:"100%",padding:"14px",borderRadius:10,border:"none",cursor:"pointer",fontWeight:700,fontSize:15,background:T.acc,color:T.bg,marginBottom:10}}>Save Changes</button>
+    <button onClick={onDelete} style={{width:"100%",padding:"13px",borderRadius:10,border:`1px solid ${T.rosBdr}`,cursor:"pointer",fontWeight:700,fontSize:14,background:T.rosBg,color:T.ros}}>🗑 Delete This Item</button>
+  </Modal>);
+}
+
+function AddModal({section,onAdd,onClose}){
+  const [name,setName]=useState("");
+  const [dose,setDose]=useState("");
+  const [opt,setOpt]=useState(false);
+  const inp={background:T.bg,border:`1px solid ${T.bdr}`,color:T.tx,borderRadius:9,padding:"12px",fontSize:15,outline:"none",width:"100%",marginBottom:12};
+  return(<Modal title={`Add to ${section}`} onClose={onClose}>
+    <div style={{color:T.txD,fontSize:11,fontWeight:600,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.07em"}}>Name</div>
+    <input value={name} onChange={e=>setName(e.target.value)} style={inp} placeholder="e.g. Zinc"/>
+    <div style={{color:T.txD,fontSize:11,fontWeight:600,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.07em"}}>Dose (optional)</div>
+    <input value={dose} onChange={e=>setDose(e.target.value)} style={{...inp,marginBottom:16}} placeholder="e.g. 30mg"/>
+    <label style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",borderRadius:9,background:T.surHi,border:`1px solid ${T.bdr}`,cursor:"pointer",marginBottom:20}}>
+      <div onClick={()=>setOpt(!opt)} style={{width:22,height:22,borderRadius:5,border:`2px solid ${opt?T.pur:T.bdrHi}`,background:opt?T.pur:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+        {opt&&<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>}
+      </div>
+      <span style={{fontSize:13,color:opt?T.pur:T.txM,fontWeight:600}}>Mark as optional</span>
+    </label>
+    <button onClick={()=>{if(name.trim())onAdd({id:`c_${Date.now()}`,name:name.trim(),dose:dose.trim(),opt});}} style={{width:"100%",padding:"14px",borderRadius:10,border:"none",cursor:"pointer",fontWeight:700,fontSize:15,background:name.trim()?T.acc:T.surHi,color:name.trim()?T.bg:T.txD}}>Add Item</button>
+  </Modal>);
+}
+
+function CheckRow({id,label,dose,done,onToggle,note,route,site,siteVal,onSite,opt,onLongPress}){
   const [open,setOpen]=useState(false);
-  const bg=opt?T.purBg:done?T.grnBg:T.sur;
-  const bdr=opt?T.purBdr:done?T.grnBdr:T.bdr;
-  const cbBdr=opt?T.pur:done?T.grn:T.bdrHi;
+  const timer=useRef(null),fired=useRef(false);
+  const lpStart=()=>{fired.current=false;timer.current=setTimeout(()=>{fired.current=true;onLongPress&&onLongPress();},600);};
+  const lpEnd=()=>clearTimeout(timer.current);
+  const handleClick=()=>{if(!fired.current)onToggle(id);};
+
+  const bg=opt?(done?"#1A1228":T.purBg):(done?T.grnBg:T.orgBg);
+  const bdr=opt?(done?T.purBdr:T.purBdr):(done?T.grnBdr:T.orgBdr);
+  const cbBdr=opt?T.pur:(done?T.grn:T.org);
   const cbBg=opt&&done?"#6050A8":done?T.grn:"transparent";
-  const tx=opt?(done?"#8878C0":T.pur):(done?T.txD:T.tx);
-  const sub=opt?(done?"#5A4A80":"#7870A8"):(done?T.txD:T.txM);
-  return(<div style={{borderRadius:10,border:`1px solid ${bdr}`,background:bg,marginBottom:7,overflow:"hidden"}}>
-    <div style={{display:"flex",alignItems:"center",gap:10,padding:"12px",cursor:"pointer",userSelect:"none",minHeight:48}} onClick={()=>onToggle(id)}>
+  const tx=opt?(done?"#7060A0":T.pur):(done?T.txD:T.org);
+  const sub=opt?(done?"#503880":"#8070B0"):(done?T.txD:"#C86000");
+
+  return(<div style={{borderRadius:10,border:`1px solid ${bdr}`,background:bg,marginBottom:7,overflow:"hidden",userSelect:"none"}}
+    onTouchStart={lpStart} onTouchEnd={lpEnd} onTouchMove={lpEnd}
+    onMouseDown={lpStart} onMouseUp={lpEnd} onMouseLeave={lpEnd}
+    onClick={handleClick}>
+    <div style={{display:"flex",alignItems:"center",gap:10,padding:"12px",cursor:"pointer",minHeight:48}}>
       <div style={{width:22,height:22,borderRadius:5,border:`2px solid ${cbBdr}`,background:cbBg,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-        {done&&<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={opt?"#E8E4FF":T.bg} strokeWidth="3.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>}
+        {done&&<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={opt?"#E8E4FF":"#fff"} strokeWidth="3.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>}
       </div>
       <div style={{flex:1,minWidth:0}}>
         <div style={{color:tx,fontSize:14,fontWeight:600,textDecoration:done?"line-through":"none",lineHeight:1.3}}>{label}</div>
-        {dose&&<div style={{color:sub,fontSize:12,marginTop:2,fontWeight:500}}> {dose}</div>}
+        {dose&&<div style={{color:sub,fontSize:12,marginTop:2,fontWeight:500}}>{dose}</div>}
       </div>
       <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
         {route==="SC"&&<span style={{background:T.ambBg,color:T.amb,border:`1px solid ${T.ambBdr}`,padding:"1px 7px",borderRadius:99,fontSize:11,fontWeight:600}}>SC</span>}
@@ -158,18 +223,17 @@ function CheckRow({id,label,dose,freq,done,onToggle,note,route,site,siteVal,onSi
   </div>);
 }
 
-function Section({title,icon,children,count,total}){
-  const [open,setOpen]=useState(true);
+function Section({title,icon,onAdd,children,count,total}){
   const done=total>0&&count===total;
   return(<div style={{marginBottom:22}}>
-    <button onClick={()=>setOpen(!open)} style={{display:"flex",alignItems:"center",gap:8,width:"100%",background:"none",border:"none",cursor:"pointer",padding:"4px 2px 10px",color:T.tx,textAlign:"left",minHeight:44}}>
+    <div style={{display:"flex",alignItems:"center",gap:8,padding:"4px 2px 10px"}}>
       <span style={{fontSize:16}}>{icon}</span>
-      <span style={{fontWeight:800,fontSize:12,letterSpacing:"0.09em",textTransform:"uppercase",color:done?T.acc:T.txM}}>{title}</span>
+      <span style={{fontWeight:800,fontSize:12,letterSpacing:"0.09em",textTransform:"uppercase",color:done?T.acc:T.txM,flex:1}}>{title}</span>
       {total>0&&<><span style={{fontSize:11,color:done?T.acc:T.txD}}>{count}/{total}</span>
         {done&&<span style={{fontSize:10,color:T.acc,background:T.accBg,padding:"1px 6px",borderRadius:99,border:`1px solid ${T.accBdr}`,fontWeight:700}}>✓</span>}</>}
-      <svg style={{marginLeft:"auto",transform:open?"":"rotate(-90deg)",transition:"transform 0.2s",flexShrink:0}} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.txD} strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/></svg>
-    </button>
-    {open&&<div>{children}</div>}
+      <button onClick={onAdd} style={{width:26,height:26,borderRadius:7,border:`1px solid ${T.bdrHi}`,background:T.surHi,color:T.txM,fontSize:17,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,marginLeft:4,flexShrink:0}}>+</button>
+    </div>
+    <div>{children}</div>
   </div>);
 }
 
@@ -253,16 +317,64 @@ function SideEffects({dayData,onUpdate}){
   </div>);
 }
 
-function TodayTab({dayData,onUpdate,saving}){
+function TodayTab({dayData,onUpdate,saving,overrides,onSaveOverrides}){
+  const [editTarget,setEditTarget]=useState(null);
+  const [addSection,setAddSection]=useState(null);
   const checked=dayData.checked||{};
   const sites=dayData.sites||{};
   const toggle=id=>onUpdate({...dayData,checked:{...checked,[id]:!checked[id]}});
   const setSite=(id,v)=>onUpdate({...dayData,sites:{...sites,[id]:v}});
-  const visible=SCHEDULE.flatMap(b=>b.items.filter(i=>!i.opt).map(i=>res(i.src,i.id)).filter(x=>x&&(!CONDITIONS[x.id]||CONDITIONS[x.id]())));
-  const done=visible.filter(i=>checked[i.id]).length,total=visible.length;
+
+  const getItems=block=>{
+    const base=block.items
+      .map(i=>{
+        const item=res(i.src,i.id);
+        const eff=applyOvr(item,overrides);
+        if(!eff)return null;
+        if(!i.opt&&CONDITIONS[eff.id]&&!CONDITIONS[eff.id]())return null;
+        return{...eff,opt:!!i.opt,_custom:false};
+      }).filter(Boolean);
+    const custom=(overrides.custom[block.time]||[]).map(c=>{
+      const o=overrides.items[c.id]||{};
+      if(o.deleted)return null;
+      return{...c,name:o.name||c.name,dose:o.dose!==undefined?o.dose:c.dose,_custom:true};
+    }).filter(Boolean);
+    return [...base,...custom];
+  };
+
+  const handleEdit=(item,blockTime)=>setEditTarget({item,blockTime});
+  const handleSaveEdit=(name,dose)=>{
+    if(!editTarget)return;
+    const next={...overrides,items:{...overrides.items,[editTarget.item.id]:{...(overrides.items[editTarget.item.id]||{}),name,dose}}};
+    onSaveOverrides(next);setEditTarget(null);
+  };
+  const handleDelete=()=>{
+    if(!editTarget)return;
+    const {item,blockTime}=editTarget;
+    if(item._custom){
+      const next={...overrides,custom:{...overrides.custom,[blockTime]:(overrides.custom[blockTime]||[]).filter(c=>c.id!==item.id)}};
+      onSaveOverrides(next);
+    } else {
+      const next={...overrides,items:{...overrides.items,[item.id]:{...(overrides.items[item.id]||{}),deleted:true}}};
+      onSaveOverrides(next);
+    }
+    const newChecked={...checked};delete newChecked[editTarget.item.id];
+    onUpdate({...dayData,checked:newChecked});
+    setEditTarget(null);
+  };
+  const handleAdd=item=>{
+    const next={...overrides,custom:{...overrides.custom,[addSection]:[...(overrides.custom[addSection]||[]),item]}};
+    onSaveOverrides(next);setAddSection(null);
+  };
+
+  const allReg=SCHEDULE.flatMap(b=>getItems(b).filter(i=>!i.opt));
+  const done=allReg.filter(i=>checked[i.id]).length,total=allReg.length;
   const pct=total?Math.round(done/total*100):0;
-  const optDone=SCHEDULE.flatMap(b=>b.items.filter(i=>i.opt).map(i=>res(i.src,i.id)).filter(Boolean)).filter(i=>checked[i.id]).length;
+  const optDone=SCHEDULE.flatMap(b=>getItems(b).filter(i=>i.opt)).filter(i=>checked[i.id]).length;
+
   return(<div>
+    {editTarget&&<EditModal item={editTarget.item} onSave={handleSaveEdit} onDelete={handleDelete} onClose={()=>setEditTarget(null)}/>}
+    {addSection&&<AddModal section={addSection} onAdd={handleAdd} onClose={()=>setAddSection(null)}/>}
     <div style={{display:"flex",alignItems:"center",gap:16,padding:16,borderRadius:12,border:`1px solid ${pct===100?T.grnBdr:T.bdr}`,background:pct===100?T.grnBg:T.sur,marginBottom:20}}>
       <div style={{position:"relative",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
         <Ring pct={pct} size={68} stroke={5}/><span style={{position:"absolute",fontSize:13,fontWeight:700}}>{pct}%</span>
@@ -277,20 +389,24 @@ function TodayTab({dayData,onUpdate,saving}){
         {saving&&<div style={{color:T.acc,fontSize:11,marginTop:4}}>saving…</div>}
       </div>
     </div>
+    <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",borderRadius:9,background:T.orgBg,border:`1px solid ${T.orgBdr}`,marginBottom:16}}>
+      <span style={{fontSize:12}}>💊</span>
+      <span style={{fontSize:11,color:"#C06000"}}>hold any item to rename, change dose or delete</span>
+    </div>
     <CycleStatus/>
     {SCHEDULE.map(block=>{
-      const reg=block.items.filter(i=>!i.opt).map(i=>res(i.src,i.id)).filter(x=>x&&(!CONDITIONS[x.id]||CONDITIONS[x.id]()));
-      const opt=block.items.filter(i=>i.opt).map(i=>({...res(i.src,i.id),opt:true})).filter(x=>x&&x.id);
-      if(!reg.length&&!opt.length) return null;
-      return(<Section key={block.time} title={block.time} icon={block.icon} count={reg.filter(i=>checked[i.id]).length} total={reg.length}>
-        {reg.map(p=><CheckRow key={p.id} id={p.id} label={p.name} dose={p.dose||""} freq={p.freq||""} done={!!checked[p.id]} onToggle={toggle} note={p.notes} route={p.route} site={!!p.site} siteVal={sites[p.id]} onSite={setSite}/>)}
+      const allItems=getItems(block);
+      const reg=allItems.filter(i=>!i.opt);
+      const opt=allItems.filter(i=>i.opt);
+      return(<Section key={block.time} title={block.time} icon={block.icon} count={reg.filter(i=>checked[i.id]).length} total={reg.length} onAdd={()=>setAddSection(block.time)}>
+        {reg.map(p=><CheckRow key={p.id} id={p.id} label={p.name} dose={p.dose||""} done={!!checked[p.id]} onToggle={toggle} note={p.notes} route={p.route} site={!!p.site} siteVal={sites[p.id]} onSite={setSite} onLongPress={()=>handleEdit(p,block.time)}/>)}
         {opt.length>0&&<>
-          {reg.length>0&&<div style={{display:"flex",alignItems:"center",gap:8,margin:"10px 0 6px",opacity:0.6}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,margin:"10px 0 6px",opacity:0.6}}>
             <div style={{flex:1,height:"1px",background:T.purBdr}}/>
             <span style={{fontSize:9,color:T.pur,fontWeight:700,letterSpacing:"0.07em",textTransform:"uppercase"}}>optional</span>
             <div style={{flex:1,height:"1px",background:T.purBdr}}/>
-          </div>}
-          {opt.map(p=><CheckRow key={p.id} id={p.id} label={p.name} dose={p.dose||""} freq={p.freq||""} done={!!checked[p.id]} onToggle={toggle} note={p.notes} route={p.route} site={!!p.site} siteVal={sites[p.id]} onSite={setSite} opt/>)}
+          </div>
+          {opt.map(p=><CheckRow key={p.id} id={p.id} label={p.name} dose={p.dose||""} done={!!checked[p.id]} onToggle={toggle} note={p.notes} route={p.route} site={!!p.site} siteVal={sites[p.id]} onSite={setSite} opt onLongPress={()=>handleEdit(p,block.time)}/>)}
         </>}
       </Section>);
     })}
@@ -475,11 +591,11 @@ function NotesTab(){
   return(<div>
     <div style={{...c,border:`1px solid ${T.accBdr}`}}>
       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14}}><span style={{fontSize:17}}>📋</span><span style={{fontWeight:800,fontSize:14}}>Current Stack</span></div>
-      {[["BREAKFAST 🌞",["Aripiprazole — 5mg","Calcium | K2 | D3 — 600mg | 180mcg | 1000 IU","Creatine — 5g","MSM | Boron — 750mg | 6mg","Multivitamin — 1 tablet","Nail Gummy — 1 gummy","Omega-3 | EPA | DHA — 1500mg | 540mg | 360mg","Probiotic — 30B CFU","Vitamin D3 additional — 2000 IU","[Optional] Telmisartan — 40mg if BP elevated","[Optional] TUDCA — 500mg","[Optional] DHB (1st) — 500mg after eating"]],
-        ["LUNCH 🥗",["Liposomal Vitamin C — 1000mg","Anastrozole — 0.5mg every 3 days (Day 0, 3, 6…)","[Optional] DHB (2nd) — 500mg after eating"]],
-        ["PRE WORKOUT 💪",["NAC — 1000mg","Taurine (1st) — 1g"]],
-        ["DINNER 🌃",["Ashwagandha — 300mg","Eggshell Powder — ~450mg","Glucosamine — 1500mg","Turmeric — 840mg (with piperine)","[Optional] Nebivolol — 2.5mg if BP/HR elevated","[Optional] DHB (3rd) — 500mg after eating"]],
-        ["PRE BED 🌑",["Glycine — 2g","Magnesium Glycinate — 160mg","Taurine (2nd) — 1g","[Optional] BPC-157 — 500mcg SC","[Optional] HGH — 2→10 IU SC (fasted, pre-bed only)"]],
+      {[["BREAKFAST 🌞",["Aripiprazole — 5mg","Anastrozole — 0.5mg (Day 0, 3, 6…)","Calcium | K2 | D3 — 600mg | 180mcg | 1000 IU","Creatine — 5g","MSM | Boron — 750mg | 6mg","Multivitamin — 1 tablet","Nail Gummy — 1 gummy","Omega-3 | EPA | DHA — 1500mg | 540mg | 360mg","Probiotic — 30B CFU","Vitamin D3 additional — 2000 IU","[Optional] Telmisartan — 40mg","[Optional] TUDCA — 500mg","[Optional] DHB (1st) — 500mg after eating"]],
+        ["LUNCH 🥗",["Liposomal Vitamin C — 1000mg","[Optional] DHB (2nd) — 500mg after eating"]],
+        ["PRE-WORKOUT 💪",["NAC — 1000mg","Taurine (1st) — 1g"]],
+        ["DINNER 🌃",["Ashwagandha — 300mg","Eggshell Powder — ~450mg","Glucosamine — 1500mg","Turmeric — 840mg (with piperine)","Glycine — 2g","Taurine (2nd) — 1g","[Optional] Nebivolol — 2.5mg","[Optional] DHB (3rd) — 500mg after eating"]],
+        ["PRE-BED 🌑",["Magnesium Glycinate — 160mg","Melatonin — 0.5mg","[Optional] BPC-157 — 500mcg SC","[Optional] HGH — 2→10 IU SC (fasted, pre-bed only)"]],
       ].map(([s,items])=><div key={s}>{sl(s)}{items.map(item=>dot(item.startsWith("[Optional]")?T.pur:T.grn,item))}</div>)}
     </div>
     <div style={c}>
@@ -502,17 +618,27 @@ function App(){
   const [err,setErr]=useState(false);
   const [history,setHistory]=useState(()=>{const r=sGet("history")||{};return Object.fromEntries(Object.entries(r).filter(([d])=>d>=CYCLE_START));});
   const [bloodwork,setBloodwork]=useState(()=>{const s=sGet("bloodwork");return s&&Object.keys(s).length?s:{};});
+  const [overrides,setOverrides]=useState(initOverrides);
   const today=getToday();
+
   const updateDay=useCallback(data=>{
     setSaving(true);
     const next={...history,[today]:data};
     setHistory(next);
     setTimeout(()=>{const ok=sSet("history",next);setSaving(false);if(ok){setErr(false);setFlash(true);setTimeout(()=>setFlash(false),1200);}else setErr(true);},0);
   },[history,today]);
+
   const saveLabs=useCallback((date,vals)=>{const next={...bloodwork,[date]:vals};setBloodwork(next);if(!sSet("bloodwork",next))setErr(true);},[bloodwork]);
+
+  const saveOverrides=useCallback(next=>{setOverrides(next);sSet("overrides",next);},[]);
+
   const todayData=history[today]||{};
-  const vis=SCHEDULE.flatMap(b=>b.items.filter(i=>!i.opt).map(i=>res(i.src,i.id)).filter(x=>x&&(!CONDITIONS[x.id]||CONDITIONS[x.id]())));
-  const pct=vis.length?Math.round(vis.filter(i=>(todayData.checked||{})[i.id]).length/vis.length*100):0;
+  const pct=(()=>{
+    const reg=SCHEDULE.flatMap(b=>b.items.filter(i=>!i.opt).map(i=>{const item=applyOvr(res(i.src,i.id),overrides);if(!item)return null;if(CONDITIONS[i.id]&&!CONDITIONS[i.id]())return null;return item;}).filter(Boolean));
+    const done=reg.filter(i=>(todayData.checked||{})[i.id]).length;
+    return reg.length?Math.round(done/reg.length*100):0;
+  })();
+
   return(<div style={{minHeight:"100vh",background:T.bg}}>
     <div style={{position:"sticky",top:0,zIndex:20,background:"rgba(17,25,32,0.96)",backdropFilter:"blur(14px)",borderBottom:`1px solid ${T.bdr}`,padding:"10px 16px",paddingTop:"calc(10px + env(safe-area-inset-top,0px))"}}>
       <div style={{maxWidth:770,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
@@ -532,7 +658,7 @@ function App(){
       </div>
     </div>
     <div style={{maxWidth:770,margin:"0 auto",padding:"18px 16px 110px"}}>
-      {tab==="today"  &&<TodayTab dayData={todayData} onUpdate={updateDay} saving={saving}/>}
+      {tab==="today"  &&<TodayTab dayData={todayData} onUpdate={updateDay} saving={saving} overrides={overrides} onSaveOverrides={saveOverrides}/>}
       {tab==="graphs" &&<GraphsTab history={history} dayData={todayData} onUpdate={updateDay}/>}
       {tab==="history"&&<HistoryTab history={history}/>}
       {tab==="labs"   &&<LabsTab bloodwork={bloodwork} onSave={saveLabs}/>}
