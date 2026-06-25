@@ -24,7 +24,7 @@ const T={bg:"#111920",sur:"#18242C",surHi:"#1E2E38",bdr:"#273848",bdrHi:"#354F62
   tx:"#E8E0D8",txM:"#8AAAB8",txD:"#4E6A7A",
   acc:"#6DB8AE",accBg:"#102624",accBdr:"#2E6A5E",
   grn:"#6DB8AE",grnBg:"#0E2422",grnBdr:"#2E6A5E",
-  org:"#FF8000",orgBg:"#200E00",orgBdr:"#994000",
+  org:"#D4782A",orgBg:"#1C0E04",orgBdr:"#7A3C10",
   amb:"#C8905A",ambBg:"#2A1C0C",ambBdr:"#7A4620",
   ros:"#C07070",rosBg:"#2A1616",rosBdr:"#6A3030",
   blu:"#5EA8D0",bluBg:"#0C1E30",bluBdr:"#2A5A7A",
@@ -34,7 +34,7 @@ function getToday(){return new Intl.DateTimeFormat("en-CA",{timeZone:"Australia/
 function sGet(k){try{const r=localStorage.getItem("jpt_"+k);return r?JSON.parse(r):null;}catch{return null;}}
 function sSet(k,v){try{localStorage.setItem("jpt_"+k,JSON.stringify(v));return true;}catch(e){if(k==="history"){try{const cut=new Date();cut.setDate(cut.getDate()-90);const pr=Object.fromEntries(Object.entries(v).filter(([d])=>new Date(d)>=cut));localStorage.setItem("jpt_"+k,JSON.stringify(pr));return true;}catch{return false;}}return false;}}
 
-const CYCLE_START="2026-06-22";
+const CYCLE_START="2026-06-26";
 function getCycleDay(){
   const s=new Date(CYCLE_START+"T00:00:00+10:00");
   const sUTC=Date.UTC(s.getFullYear(),s.getMonth(),s.getDate());
@@ -192,7 +192,7 @@ function CheckRow({id,label,dose,done,onToggle,note,route,site,siteVal,onSite,op
   const cbBdr=opt?T.pur:(done?T.grn:T.org);
   const cbBg=opt&&done?"#6050A8":done?T.grn:"transparent";
   const tx=opt?(done?"#7060A0":T.pur):(done?T.txD:T.org);
-  const sub=opt?(done?"#503880":"#8070B0"):(done?T.txD:"#C86000");
+  const sub=opt?(done?"#503880":"#8070B0"):(done?T.txD:"#9A5420");
 
   return(<div style={{borderRadius:10,border:`1px solid ${bdr}`,background:bg,marginBottom:7,overflow:"hidden",userSelect:"none"}}
     onTouchStart={lpStart} onTouchEnd={lpEnd} onTouchMove={lpEnd}
@@ -391,7 +391,7 @@ function TodayTab({dayData,onUpdate,saving,overrides,onSaveOverrides}){
     </div>
     <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 10px",borderRadius:9,background:T.orgBg,border:`1px solid ${T.orgBdr}`,marginBottom:16}}>
       <span style={{fontSize:12}}>💊</span>
-      <span style={{fontSize:11,color:"#C06000"}}>hold any item to rename, change dose or delete</span>
+      <span style={{fontSize:11,color:"#9A5420"}}>hold any item to rename, change dose or delete</span>
     </div>
     <CycleStatus/>
     {SCHEDULE.map(block=>{
